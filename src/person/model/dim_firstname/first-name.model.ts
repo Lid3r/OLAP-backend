@@ -5,6 +5,7 @@ import {
   Model,
   PrimaryKey,
   Table,
+  Unique,
 } from 'sequelize-typescript';
 import { Person } from '../person.model';
 
@@ -15,6 +16,7 @@ export class FirstName extends Model {
   @Column
   id: number;
 
+  @Unique
   @Column
   name: string;
 

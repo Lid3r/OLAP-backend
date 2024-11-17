@@ -1,5 +1,6 @@
 import {
   AutoIncrement,
+  BelongsTo,
   Column,
   ForeignKey,
   Model,
@@ -19,21 +20,36 @@ export class Person extends Model {
   @Column
   id: number;
 
+  @BelongsTo(() => FirstName)
+  firstName: FirstName;
+
   @Column
   @ForeignKey(() => FirstName)
   nameId: number;
+
+  @BelongsTo(() => LastName)
+  lastName: LastName;
 
   @Column
   @ForeignKey(() => LastName)
   surnameId: number;
 
+  @BelongsTo(() => Year)
+  year: Year;
+
   @Column
   @ForeignKey(() => Year)
   yearId: number;
 
+  @BelongsTo(() => Job)
+  job: Job;
+
   @Column
   @ForeignKey(() => Job)
   jobId: number;
+
+  @BelongsTo(() => Health)
+  health: Health;
 
   @Column
   @ForeignKey(() => Health)

@@ -7,24 +7,14 @@ import { LastName } from './model/dim_lastname/last-name.model';
 import { Health } from './model/dim_health/health.model';
 import { Job } from './model/dim_job/job.model';
 import { Year } from './model/dim_years/year.model';
-import { FindOptions, WhereOptions } from 'sequelize';
-
-export enum Aggregator {
-  SUM = 'SUM',
-  AVG = 'AVG',
-  COUNT = 'COUNT',
-  MIN = 'MIN',
-  MAX = 'MAX',
-}
-
-export interface Operation {
-  field: string;
-  value: number;
-  aggregator: Aggregator;
-}
+import { FindOptions, Includeable, WhereOptions } from 'sequelize';
+import { Aggregator, Operation, TableBody, TableField } from './table.dto';
 
 @Injectable()
 export class PersonService {
+  private includeables: Includeable[] = [];
+  private model: any;
+
   constructor(
     @InjectModel(Person) private personModel: typeof Person,
     @InjectModel(FirstName) private nameModel: typeof FirstName,
@@ -46,26 +36,20 @@ export class PersonService {
   }
 
   async findWithOptions(options?: FindOptions<any>) {
-    const people = await this.personModel.findAll({
+    const people = await this.model.findAll({
       ...options,
       attributes: ['id'],
-      include: [
-        { model: FirstName, as: 'firstName', attributes: ['name'] },
-        { model: LastName, as: 'lastName', attributes: ['surname'] },
-        { model: Year, as: 'year', attributes: ['year'] },
-        { model: Job, as: 'job', attributes: ['jobName'] },
-        { model: Health, as: 'health', attributes: ['healthType'] },
-      ],
+      include: this.includeables,
     });
 
     return people.map((person) => {
       return {
         id: person.id,
-        firstName: person.firstName.name,
-        lastName: person.lastName.surname,
-        year: person.year.year,
-        jobName: person.job.jobName,
-        healthType: person.health.healthType,
+        firstName: person.firstName?.name,
+        lastName: person.lastName?.surname,
+        year: person.year?.year,
+        jobName: person.job?.jobName,
+        healthType: person.health?.healthType,
       };
     });
   }
@@ -193,20 +177,7 @@ export class PersonService {
    * @returns the count of unique values for the given axis
    */
   async getCountFor(axis: string): Promise<number> {
-    switch (axis) {
-      case 'firstName':
-        return await this.nameModel.count();
-      case 'lastName':
-        return await this.lastNameModel.count();
-      case 'year':
-        return await this.yearModel.count();
-      case 'jobName':
-        return await this.jobModel.count();
-      case 'healthType':
-        return await this.healthModel.count();
-      default:
-        return 0;
-    }
+    return (this.bindModel(axis) as any).count();
   }
 
   /**
@@ -252,6 +223,84 @@ export class PersonService {
     return splitArray;
   }
 
+  async createTable2(request: TableBody) {
+    this.includeables = this.createIncludeables(request.definition.fields);
+    this.model = this.bindFact(request.definition.fact);
+
+    const arraySize = await this.getCountFor(request.query.x);
+    const array = await this.createPermutations(
+      request.query.y,
+      request.query.x,
+      request.query.z,
+      request.query.operation,
+    );
+
+    //Get unique values of z
+    const uniqueZ = array
+      .map((value) => value[request.query.z])
+      .filter((value, index, self) => self.indexOf(value) === index);
+
+    //Sort by z
+    const sorted = array.sort(
+      (a, b) => a[request.query.z] - b[request.query.z],
+    );
+
+    const splitArray = uniqueZ.map((uniqueZ) => {
+      return {
+        z: uniqueZ,
+        items: sorted
+          .filter((value) => value[request.query.z] == uniqueZ)
+          .reduce((resultArray, item, index) => {
+            const chunkIndex = Math.floor(index / arraySize);
+
+            if (!resultArray[chunkIndex]) {
+              resultArray.push([]);
+            }
+
+            resultArray[chunkIndex].push(item);
+
+            return resultArray;
+          }, []),
+      };
+    });
+
+    return splitArray;
+  }
+
+  private createIncludeables(fields: TableField[]) {
+    return fields.map((field) => {
+      return {
+        model: this.bindModel(field.fieldName),
+        as: field.fieldName,
+        attributes: [field.valueName],
+      };
+    });
+  }
+
+  private bindFact(fact: string) {
+    switch (fact) {
+      case 'person':
+        return this.personModel;
+    }
+  }
+
+  private bindModel(field: string) {
+    switch (field) {
+      case 'firstName':
+        return this.nameModel;
+      case 'lastName':
+        return this.lastNameModel;
+      case 'year':
+        return this.yearModel;
+      case 'job':
+        return this.jobModel;
+      case 'health':
+        return this.healthModel;
+      default:
+        return null;
+    }
+  }
+
   createFieldname(field: string) {
     switch (field) {
       case 'firstName':
@@ -262,7 +311,7 @@ export class PersonService {
         return '$year.year$';
       case 'jobName':
         return '$job.jobName$';
-      case 'healthType':
+      case 'health':
         return '$health.healthType$';
       default:
         return null;
@@ -291,6 +340,7 @@ export class PersonService {
     if (operation.aggregator == Aggregator.COUNT) {
       return await Promise.all(
         permutations.map(async (permutation) => {
+          console.log(createWhereOptions(permutation));
           const result = await this.findWithOptions({
             where: createWhereOptions(permutation),
           });
@@ -318,23 +368,6 @@ export class PersonService {
             };
           }),
         );
-    }
-  }
-
-  private bindModel(field: string) {
-    switch (field) {
-      case 'nameId':
-        return this.nameModel;
-      case 'surnameId':
-        return this.lastNameModel;
-      case 'yearId':
-        return this.yearModel;
-      case 'jobId':
-        return this.jobModel;
-      case 'healthId':
-        return this.healthModel;
-      default:
-        return null;
     }
   }
 

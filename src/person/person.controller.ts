@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Post, Query } from '@nestjs/common';
 import { CreatePersonDTO } from './model/person.dto';
-import { Operation, PersonService } from './person.service';
+import { PersonService } from './person.service';
+import { Operation, TableBody } from './table.dto';
 
 @Controller('person')
 export class PersonController {
@@ -33,6 +34,12 @@ export class PersonController {
     } as Operation;
     //This needs to be transposed to display correctly in the table
     return this._personService.createTable(y, x, z, operationInfo);
+  }
+
+  @Post('/table2')
+  createTable2(@Body() body: TableBody): any {
+    //This needs to be transposed to display correctly in the table
+    return this._personService.createTable2(body);
   }
 
   @Delete('/delete')

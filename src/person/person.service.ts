@@ -10,10 +10,18 @@ import { Year } from './model/dim_years/year.model';
 import { FindOptions, Includeable, WhereOptions } from 'sequelize';
 import { Aggregator, Operation, TableBody, TableField } from './table.dto';
 
+export interface ReturnModel {
+  x: { key: string; model: string; value: string };
+  y: { key: string; model: string; value: string };
+  z: { key: string; model: string; value: string };
+  field: { key: string; model: string; value: string };
+}
+
 @Injectable()
 export class PersonService {
   private includeables: Includeable[] = [];
   private model: any;
+  private returnModel: ReturnModel;
 
   constructor(
     @InjectModel(Person) private personModel: typeof Person,
@@ -36,20 +44,23 @@ export class PersonService {
   }
 
   async findWithOptions(options?: FindOptions<any>) {
-    const people = await this.model.findAll({
+    const returnedRows = await this.model.findAll({
       ...options,
       attributes: ['id'],
       include: this.includeables,
     });
 
-    return people.map((person) => {
+    return returnedRows.map((row: any) => {
       return {
-        id: person.id,
-        firstName: person.firstName?.name,
-        lastName: person.lastName?.surname,
-        year: person.year?.year,
-        jobName: person.job?.jobName,
-        health: person.health?.healthType,
+        id: row.id,
+        [this.returnModel.x.key]:
+          row[this.returnModel.x.model][this.returnModel.x.value],
+        [this.returnModel.y.key]:
+          row[this.returnModel.y.model][this.returnModel.y.value],
+        [this.returnModel.z.key]:
+          row[this.returnModel.z.model][this.returnModel.z.value],
+        [this.returnModel.field.key]:
+          row[this.returnModel.field.model][this.returnModel.field.value],
       };
     });
   }
@@ -232,6 +243,29 @@ export class PersonService {
   async createTable2(request: TableBody) {
     this.includeables = this.createIncludeables(request.definition.fields);
     this.model = this.bindFact(request.definition.fact);
+
+    this.returnModel = {
+      x: {
+        key: request.definition.fields[0].fieldName,
+        model: request.definition.fields[0].fieldName,
+        value: request.definition.fields[0].valueName,
+      },
+      y: {
+        key: request.definition.fields[1].fieldName,
+        model: request.definition.fields[1].fieldName,
+        value: request.definition.fields[1].valueName,
+      },
+      z: {
+        key: request.definition.fields[2].fieldName,
+        model: request.definition.fields[2].fieldName,
+        value: request.definition.fields[2].valueName,
+      },
+      field: {
+        key: request.definition.fields[3].fieldName,
+        model: request.definition.fields[3].fieldName,
+        value: request.definition.fields[3].valueName,
+      },
+    };
 
     const arraySize = await this.getCountFor(request.query.x);
     const array = await this.createPermutations(

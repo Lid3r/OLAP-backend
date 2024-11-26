@@ -49,7 +49,7 @@ export class PersonService {
         lastName: person.lastName?.surname,
         year: person.year?.year,
         jobName: person.job?.jobName,
-        healthType: person.health?.healthType,
+        health: person.health?.healthType,
       };
     });
   }
@@ -223,6 +223,12 @@ export class PersonService {
     return splitArray;
   }
 
+  /**
+   * Given a TableBody, generate a 2-dimensional array where the outer array is split by the unique values of z.
+   * The inner arrays are split by the primary axis (x) and are sorted by z.
+   * @param request - The TableBody containing the definition and query.
+   * @returns A 2-dimensional array of permutations split by the unique values of z.
+   */
   async createTable2(request: TableBody) {
     this.includeables = this.createIncludeables(request.definition.fields);
     this.model = this.bindFact(request.definition.fact);
@@ -356,6 +362,7 @@ export class PersonService {
       case Aggregator.SUM:
         return await Promise.all(
           permutations.map(async (permutation) => {
+            console.log(createWhereOptions(permutation));
             const result = await this.findWithOptions({
               where: createWhereOptions(permutation),
             });

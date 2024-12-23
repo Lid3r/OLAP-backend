@@ -7,24 +7,22 @@ import { LastName } from './model/dim_lastname/last-name.model';
 import { Health } from './model/dim_health/health.model';
 import { Job } from './model/dim_job/job.model';
 import { Year } from './model/dim_years/year.model';
-import { FindOptions, WhereOptions } from 'sequelize';
+import { FindOptions, Includeable, WhereOptions } from 'sequelize';
+import { Aggregator, Operation, TableBody, TableField } from './table.dto';
 
-export enum Aggregator {
-  SUM = 'SUM',
-  AVG = 'AVG',
-  COUNT = 'COUNT',
-  MIN = 'MIN',
-  MAX = 'MAX',
-}
-
-export interface Operation {
-  field: string;
-  value: number;
-  aggregator: Aggregator;
+export interface ReturnModel {
+  x: { key: string; model: string; value: string };
+  y: { key: string; model: string; value: string };
+  z: { key: string; model: string; value: string };
+  field: { key: string; model: string; value: string };
 }
 
 @Injectable()
 export class PersonService {
+  private includeables: Includeable[] = [];
+  private model: any;
+  private returnModel: ReturnModel;
+
   constructor(
     @InjectModel(Person) private personModel: typeof Person,
     @InjectModel(FirstName) private nameModel: typeof FirstName,
@@ -45,33 +43,35 @@ export class PersonService {
     this.healthModel.sync();
   }
 
+  /**
+   * Finds and retrieves rows from the database based on the provided options,
+   * and maps each row to a simplified object containing selected fields.
+   *
+   * @param options - Optional FindOptions object to customize the query, such as
+   *                  filtering, sorting, and pagination.
+   * @returns A promise that resolves to an array of objects, each containing the
+   *          `id` and selected fields as specified in the `returnModel`.
+   */
   async findWithOptions(options?: FindOptions<any>) {
-    const people = await this.personModel.findAll({
+    const returnedRows = await this.model.findAll({
       ...options,
       attributes: ['id'],
-      include: [
-        { model: FirstName, as: 'firstName', attributes: ['name'] },
-        { model: LastName, as: 'lastName', attributes: ['surname'] },
-        { model: Year, as: 'year', attributes: ['year'] },
-        { model: Job, as: 'job', attributes: ['jobName'] },
-        { model: Health, as: 'health', attributes: ['healthType'] },
-      ],
+      include: this.includeables,
     });
 
-    return people.map((person) => {
+    return returnedRows.map((row: any) => {
       return {
-        id: person.id,
-        firstName: person.firstName.name,
-        lastName: person.lastName.surname,
-        year: person.year.year,
-        jobName: person.job.jobName,
-        healthType: person.health.healthType,
+        id: row.id,
+        [this.returnModel.x.key]:
+          row[this.returnModel.x.model][this.returnModel.x.value],
+        [this.returnModel.y.key]:
+          row[this.returnModel.y.model][this.returnModel.y.value],
+        [this.returnModel.z.key]:
+          row[this.returnModel.z.model][this.returnModel.z.value],
+        [this.returnModel.field.key]:
+          row[this.returnModel.field.model][this.returnModel.field.value],
       };
     });
-  }
-
-  async getNames() {
-    return await this.lastNameModel.findAll();
   }
 
   async obliterate() {
@@ -83,6 +83,11 @@ export class PersonService {
     this.healthModel.destroy({ where: {} });
   }
 
+  /**
+   * Creates a new person.
+   *
+   * @param person The person data to save.
+   */
   async create(person: CreatePersonDTO) {
     const nameId = (
       await this.nameModel.findOrCreate({
@@ -128,6 +133,13 @@ export class PersonService {
     });
   }
 
+  /**
+   * Given three fields, fetches all unique values for those fields in the database.
+   * @param x The first field.
+   * @param y The second field.
+   * @param z The third field.
+   * @returns An object containing an array of unique values for each field.
+   */
   private async getUniqueValues(x: string, y: string, z: string) {
     const allX = await this.findWithOptions({
       attributes: [x],
@@ -152,8 +164,6 @@ export class PersonService {
     const uniqueZ = allZ
       .map((value) => value[z])
       .filter((value, index, self) => self.indexOf(value) === index);
-
-    console.log(uniqueX, uniqueY, uniqueZ);
 
     return { x: uniqueX, y: uniqueY, z: uniqueZ };
   }
@@ -183,7 +193,6 @@ export class PersonService {
           [z]: permutation[2],
         };
       });
-    console.log(permutations);
     return permutations;
   }
 
@@ -193,50 +202,68 @@ export class PersonService {
    * @returns the count of unique values for the given axis
    */
   async getCountFor(axis: string): Promise<number> {
-    switch (axis) {
-      case 'firstName':
-        return await this.nameModel.count();
-      case 'lastName':
-        return await this.lastNameModel.count();
-      case 'year':
-        return await this.yearModel.count();
-      case 'jobName':
-        return await this.jobModel.count();
-      case 'healthType':
-        return await this.healthModel.count();
-      default:
-        return 0;
-    }
+    return (this.bindModel(axis) as any).count();
   }
 
   /**
-   * Creates a table of permutations split into chunks based on the unique count of the x-axis.
-   *
-   * @param x - The first field, used as the primary axis for chunking the permutations.
-   * @param y - The second field.
-   * @param z - The third field.
-   * @param operation - The operation details containing the field, value, and aggregator for filtering.
-   * @returns An array of permutations split into chunks, where each chunk corresponds to a unique value of the x-axis.
+   * Given a TableBody, generate a 2-dimensional array where the outer array is split by the unique values of z.
+   * The inner arrays are split by the primary axis (x) and are sorted by z.
+   * @param request - The TableBody containing the definition and query.
+   * @returns A 2-dimensional array of permutations split by the unique values of z.
    */
-  async createTable(x: string, y: string, z: string, operation: Operation) {
-    const xCount = await this.getCountFor(y);
-    const array = await this.createPermutations(x, y, z, operation);
+  async createTable(request: TableBody) {
+    this.includeables = this.createIncludeables(request.definition.fields);
+    this.model = this.bindFact(request.definition.fact);
+
+    this.returnModel = {
+      x: {
+        key: request.definition.fields[0].fieldName,
+        model: request.definition.fields[0].fieldName,
+        value: request.definition.fields[0].valueName,
+      },
+      y: {
+        key: request.definition.fields[1].fieldName,
+        model: request.definition.fields[1].fieldName,
+        value: request.definition.fields[1].valueName,
+      },
+      z: {
+        key: request.definition.fields[2].fieldName,
+        model: request.definition.fields[2].fieldName,
+        value: request.definition.fields[2].valueName,
+      },
+      field: {
+        key: request.definition.fields[3].fieldName,
+        model: request.definition.fields[3].fieldName,
+        value: request.definition.fields[3].valueName,
+      },
+    };
+
+    const arraySize = await this.getCountFor(request.query.x);
+    //Transpose data to correctly display in the frontend
+    const array = await this.createPermutations(
+      request.query.y,
+      request.query.x,
+      request.query.z,
+      request.query.operation,
+    );
 
     //Get unique values of z
     const uniqueZ = array
-      .map((value) => value[z])
+      .map((value) => value[request.query.z])
       .filter((value, index, self) => self.indexOf(value) === index);
 
     //Sort by z
-    const sorted = array.sort((a, b) => a[z] - b[z]);
+    const sorted = array.sort(
+      (a, b) => a[request.query.z] - b[request.query.z],
+    );
 
     const splitArray = uniqueZ.map((uniqueZ) => {
       return {
         z: uniqueZ,
         items: sorted
-          .filter((value) => value[z] == uniqueZ)
+          .filter((value) => value[request.query.z] == uniqueZ)
           .reduce((resultArray, item, index) => {
-            const chunkIndex = Math.floor(index / xCount);
+            const chunkIndex = Math.floor(index / arraySize);
 
             if (!resultArray[chunkIndex]) {
               resultArray.push([]);
@@ -252,6 +279,66 @@ export class PersonService {
     return splitArray;
   }
 
+  /**
+   * Given an array of TableField objects, generates an array of Includeable objects
+   * that can be passed to Sequelize's `findAndCountAll` method as the `include` option.
+   *
+   * @param fields - An array of TableField objects, each containing a fieldName
+   *                 (the name of the model) and a valueName (the name of the field
+   *                 in the model).
+   * @returns An array of Includeable objects, each containing a model, as (an alias
+   *          for the model), and attributes (an array of field names to include).
+   */
+  private createIncludeables(fields: TableField[]) {
+    return fields.map((field) => {
+      return {
+        model: this.bindModel(field.fieldName),
+        as: field.fieldName,
+        attributes: [field.valueName],
+      };
+    });
+  }
+
+  /**
+   * Given a fact name, returns the Sequelize model associated with the fact.
+   * @param fact - The name of the fact (e.g. 'person').
+   * @returns The Sequelize model associated with the fact, or undefined if no match is found.
+   */
+  private bindFact(fact: string) {
+    switch (fact) {
+      case 'person':
+        return this.personModel;
+    }
+  }
+
+  /**
+   * Given a field name, returns the Sequelize model associated with the field.
+   * @param field - The name of the field (e.g. 'firstName', 'lastName', etc.).
+   * @returns The Sequelize model associated with the field, or null if no match is found.
+   */
+  private bindModel(field: string) {
+    switch (field) {
+      case 'firstName':
+        return this.nameModel;
+      case 'lastName':
+        return this.lastNameModel;
+      case 'year':
+        return this.yearModel;
+      case 'job':
+        return this.jobModel;
+      case 'health':
+        return this.healthModel;
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Given a field name, returns a string that can be used as a Sequelize field name
+   * in a SELECT clause. The returned string is in the format `$modelName.fieldName$`.
+   * @param field - The name of the field.
+   * @returns A string that can be used as a Sequelize field name in a SELECT clause.
+   */
   createFieldname(field: string) {
     switch (field) {
       case 'firstName':
@@ -260,14 +347,27 @@ export class PersonService {
         return '$lastName.surname$';
       case 'year':
         return '$year.year$';
-      case 'jobName':
+      case 'job':
         return '$job.jobName$';
-      case 'healthType':
+      case 'health':
         return '$health.healthType$';
       default:
         return null;
     }
   }
+
+  /**
+   * Generates permutations of unique values for the given fields and
+   * applies the specified aggregation operation on each permutation.
+   *
+   * @param x - The first field.
+   * @param y - The second field.
+   * @param z - The third field.
+   * @param operation - The operation details containing the field, value, and aggregator
+   *                    to be used for filtering and computing the result.
+   * @returns A promise that resolves to an array of permutations. Each permutation is an object
+   *          containing the fields `x`, `y`, `z` and the result of the aggregation operation.
+   */
 
   async createPermutations(
     x: string,
@@ -288,21 +388,20 @@ export class PersonService {
       return where;
     };
 
-    if (operation.aggregator == Aggregator.COUNT) {
-      return await Promise.all(
-        permutations.map(async (permutation) => {
-          const result = await this.findWithOptions({
-            where: createWhereOptions(permutation),
-          });
-          return {
-            ...permutation,
-            result: result.length,
-          };
-        }),
-      );
-    }
-
     switch (operation.aggregator) {
+      case Aggregator.COUNT:
+        return await Promise.all(
+          permutations.map(async (permutation) => {
+            const result = await this.findWithOptions({
+              where: createWhereOptions(permutation),
+            });
+            return {
+              ...permutation,
+              result: result.length,
+            };
+          }),
+        );
+
       case Aggregator.SUM:
         return await Promise.all(
           permutations.map(async (permutation) => {
@@ -318,27 +417,52 @@ export class PersonService {
             };
           }),
         );
-    }
-  }
 
-  private bindModel(field: string) {
-    switch (field) {
-      case 'nameId':
-        return this.nameModel;
-      case 'surnameId':
-        return this.lastNameModel;
-      case 'yearId':
-        return this.yearModel;
-      case 'jobId':
-        return this.jobModel;
-      case 'healthId':
-        return this.healthModel;
-      default:
-        return null;
+      case Aggregator.AVG:
+        return await Promise.all(
+          permutations.map(async (permutation) => {
+            const result = await this.findWithOptions({
+              where: createWhereOptions(permutation),
+            });
+            return {
+              ...permutation,
+              result:
+                result.reduce((acc, curr) => acc + curr[operation.field], 0) /
+                result.length,
+            };
+          }),
+        );
+
+      case Aggregator.MIN:
+        return await Promise.all(
+          permutations.map(async (permutation) => {
+            const result = await this.findWithOptions({
+              where: createWhereOptions(permutation),
+            });
+            return {
+              ...permutation,
+              result: Math.min(...result.map((row) => row[operation.field])),
+            };
+          }),
+        );
+
+      case Aggregator.MAX:
+        return await Promise.all(
+          permutations.map(async (permutation) => {
+            const result = await this.findWithOptions({
+              where: createWhereOptions(permutation),
+            });
+            return {
+              ...permutation,
+              result: Math.max(...result.map((row) => row[operation.field])),
+            };
+          }),
+        );
     }
   }
 
   /**
+   * @deprecated
    * This has a problem of not displaying all the permutations if there are rows which don't meet all the conditions
    */
   async createTableLegacy(
@@ -375,5 +499,55 @@ export class PersonService {
         };
       }),
     );
+  }
+
+  /**
+   * @deprecated
+   * Creates a table of permutations split into chunks based on the unique count of the x-axis.
+   * This one had the problem of not being generic.
+   *
+   * @param x - The first field, used as the primary axis for chunking the permutations.
+   * @param y - The second field.
+   * @param z - The third field.
+   * @param operation - The operation details containing the field, value, and aggregator for filtering.
+   * @returns An array of permutations split into chunks, where each chunk corresponds to a unique value of the x-axis.
+   */
+  async createTableLegacy2(
+    x: string,
+    y: string,
+    z: string,
+    operation: Operation,
+  ) {
+    const xCount = await this.getCountFor(y);
+    const array = await this.createPermutations(x, y, z, operation);
+
+    //Get unique values of z
+    const uniqueZ = array
+      .map((value) => value[z])
+      .filter((value, index, self) => self.indexOf(value) === index);
+
+    //Sort by z
+    const sorted = array.sort((a, b) => a[z] - b[z]);
+
+    const splitArray = uniqueZ.map((uniqueZ) => {
+      return {
+        z: uniqueZ,
+        items: sorted
+          .filter((value) => value[z] == uniqueZ)
+          .reduce((resultArray, item, index) => {
+            const chunkIndex = Math.floor(index / xCount);
+
+            if (!resultArray[chunkIndex]) {
+              resultArray.push([]);
+            }
+
+            resultArray[chunkIndex].push(item);
+
+            return resultArray;
+          }, []),
+      };
+    });
+
+    return splitArray;
   }
 }

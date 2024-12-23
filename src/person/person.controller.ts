@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post } from '@nestjs/common';
 import { CreatePersonDTO } from './model/person.dto';
-import { Operation, PersonService } from './person.service';
+import { PersonService } from './person.service';
+import { TableBody } from './table.dto';
 
 @Controller('person')
 export class PersonController {
@@ -11,17 +12,12 @@ export class PersonController {
     return this._personService.findWithOptions();
   }
 
-  @Get('/names')
-  getNames(): any {
-    return this._personService.getNames();
-  }
-
   @Post('/create')
   createPerson(@Body() createPersonDTO: CreatePersonDTO): void {
     this._personService.create(createPersonDTO);
   }
 
-  @Get('/table')
+  /*   @Get('/table')
   createTable(@Query() query): any {
     const x = query['x'];
     const y = query['y'];
@@ -33,6 +29,12 @@ export class PersonController {
     } as Operation;
     //This needs to be transposed to display correctly in the table
     return this._personService.createTable(y, x, z, operationInfo);
+  } */
+
+  @Post('/table')
+  createTable2(@Body() body: TableBody): any {
+    //This needs to be transposed to display correctly in the table
+    return this._personService.createTable(body);
   }
 
   @Delete('/delete')

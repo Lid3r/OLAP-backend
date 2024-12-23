@@ -148,8 +148,6 @@ export class PersonService {
       .map((value) => value[z])
       .filter((value, index, self) => self.indexOf(value) === index);
 
-    console.log(uniqueX, uniqueY, uniqueZ);
-
     return { x: uniqueX, y: uniqueY, z: uniqueZ };
   }
 
@@ -178,7 +176,6 @@ export class PersonService {
           [z]: permutation[2],
         };
       });
-    console.log(permutations);
     return permutations;
   }
 
@@ -349,7 +346,7 @@ export class PersonService {
         return '$lastName.surname$';
       case 'year':
         return '$year.year$';
-      case 'jobName':
+      case 'job':
         return '$job.jobName$';
       case 'health':
         return '$health.healthType$';
@@ -377,26 +374,23 @@ export class PersonService {
       return where;
     };
 
-    if (operation.aggregator == Aggregator.COUNT) {
-      return await Promise.all(
-        permutations.map(async (permutation) => {
-          console.log(createWhereOptions(permutation));
-          const result = await this.findWithOptions({
-            where: createWhereOptions(permutation),
-          });
-          return {
-            ...permutation,
-            result: result.length,
-          };
-        }),
-      );
-    }
-
     switch (operation.aggregator) {
+      case Aggregator.COUNT:
+        return await Promise.all(
+          permutations.map(async (permutation) => {
+            const result = await this.findWithOptions({
+              where: createWhereOptions(permutation),
+            });
+            return {
+              ...permutation,
+              result: result.length,
+            };
+          }),
+        );
+
       case Aggregator.SUM:
         return await Promise.all(
           permutations.map(async (permutation) => {
-            console.log(createWhereOptions(permutation));
             const result = await this.findWithOptions({
               where: createWhereOptions(permutation),
             });
@@ -406,6 +400,47 @@ export class PersonService {
                 (acc, curr) => acc + curr[operation.field],
                 0,
               ),
+            };
+          }),
+        );
+
+      case Aggregator.AVG:
+        return await Promise.all(
+          permutations.map(async (permutation) => {
+            const result = await this.findWithOptions({
+              where: createWhereOptions(permutation),
+            });
+            return {
+              ...permutation,
+              result:
+                result.reduce((acc, curr) => acc + curr[operation.field], 0) /
+                result.length,
+            };
+          }),
+        );
+
+      case Aggregator.MIN:
+        return await Promise.all(
+          permutations.map(async (permutation) => {
+            const result = await this.findWithOptions({
+              where: createWhereOptions(permutation),
+            });
+            return {
+              ...permutation,
+              result: Math.min(...result.map((row) => row[operation.field])),
+            };
+          }),
+        );
+
+      case Aggregator.MAX:
+        return await Promise.all(
+          permutations.map(async (permutation) => {
+            const result = await this.findWithOptions({
+              where: createWhereOptions(permutation),
+            });
+            return {
+              ...permutation,
+              result: Math.max(...result.map((row) => row[operation.field])),
             };
           }),
         );

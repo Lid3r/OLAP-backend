@@ -43,6 +43,263 @@ export class PersonService {
     this.healthModel.sync();
   }
 
+  async migrate() {
+    const names = await this.nameModel.bulkCreate([
+      { name: 'John' },
+      { name: 'Jane' },
+      { name: 'Bob' },
+      { name: 'Alice' },
+      { name: 'Eve' },
+      { name: 'Charlie' },
+      { name: 'David' },
+      { name: 'Frank' },
+      { name: 'Grace' },
+      { name: 'Heidi' },
+      { name: 'Ivy' },
+      { name: 'Jack' },
+      { name: 'Karl' },
+      { name: 'Lily' },
+      { name: 'Mary' },
+      { name: 'Nina' },
+      { name: 'Oliver' },
+      { name: 'Peter' },
+      { name: 'Quinn' },
+      { name: 'Rose' },
+      { name: 'Sam' },
+      { name: 'Tom' },
+      { name: 'Ursula' },
+      { name: 'Violet' },
+      { name: 'Will' },
+      { name: 'Xavier' },
+      { name: 'Yvonne' },
+      { name: 'Zoe' },
+    ]);
+
+    const lastNames = await this.lastNameModel.bulkCreate([
+      { surname: 'Smith' },
+      { surname: 'Johnson' },
+      { surname: 'Williams' },
+      { surname: 'Brown' },
+      { surname: 'Jones' },
+      { surname: 'Garcia' },
+      {
+        surname: 'Rodriguez',
+      },
+      { surname: 'Miller' },
+      { surname: 'Martinez' },
+      { surname: 'Davis' },
+      {
+        surname: 'Hernandez',
+      },
+      { surname: 'Lopez' },
+      { surname: 'Gonzalez' },
+      { surname: 'Wilson' },
+      { surname: 'Anderson' },
+      { surname: 'Thomas' },
+      { surname: 'Taylor' },
+      { surname: 'Moore' },
+      { surname: 'Jackson' },
+      { surname: 'Martin' },
+      { surname: 'Lee' },
+      { surname: 'Perez' },
+      { surname: 'Thompson' },
+      { surname: 'White' },
+      { surname: 'Harris' },
+      { surname: 'Sanchez' },
+      { surname: 'Clark' },
+      { surname: 'Ramirez' },
+    ]);
+    const jobs = await this.jobModel.bulkCreate([
+      {
+        jobName: 'Accountant',
+      },
+      {
+        jobName: 'Actor',
+      },
+      {
+        jobName: 'Actuary',
+      },
+      {
+        jobName: 'Acupuncturist',
+      },
+      {
+        jobName: 'Administrator',
+      },
+      {
+        jobName: 'Agricultural Engineer',
+      },
+      {
+        jobName: 'Agricultural Inspector',
+      },
+      {
+        jobName: 'Agricultural Manager',
+      },
+      {
+        jobName: 'Agricultural Scientist',
+      },
+      {
+        jobName: 'Agricultural Technician',
+      },
+      {
+        jobName: 'Air Traffic Controller',
+      },
+      {
+        jobName: 'Aircraft Maintenance Engineer',
+      },
+      {
+        jobName: 'Aircraft Maintenance Engineer (Avionics)',
+      },
+      {
+        jobName: 'Aircraft Maintenance Engineer (Mechanical)',
+      },
+      {
+        jobName: 'Airline Customer Service Agent',
+      },
+      {
+        jobName: 'Airline Pilot',
+      },
+      {
+        jobName: 'Airline Reservation Agent',
+      },
+      {
+        jobName: 'Ambulance Officer',
+      },
+      {
+        jobName: 'Anaesthetist',
+      },
+      {
+        jobName: 'Animal Attendant',
+      },
+      {
+        jobName: 'Animal Technician',
+      },
+      {
+        jobName: 'Animator',
+      },
+      {
+        jobName: 'Antique Dealer',
+      },
+      {
+        jobName: 'App Developer',
+      },
+      {
+        jobName: 'Arborist',
+      },
+      {
+        jobName: 'Archaeologist',
+      },
+      {
+        jobName: 'Architect',
+      },
+      {
+        jobName: 'Architectural Draftsperson',
+      },
+      {
+        jobName: 'Archivist',
+      },
+      {
+        jobName: 'Art Teacher',
+      },
+      {
+        jobName: 'Artist',
+      },
+      {
+        jobName: 'Arts Administrator',
+      },
+      {
+        jobName: 'Audiologist',
+      },
+      {
+        jobName: 'Author',
+      },
+      {
+        jobName: 'Auto Electrician',
+      },
+      {
+        jobName: 'Automotive Electrician',
+      },
+      {
+        jobName: 'Automotive Electrician (Heavy Vehicles)',
+      },
+      {
+        jobName: 'Automotive Electrician (Light Vehicles)',
+      },
+      {
+        jobName: 'Automotive Electrician (Motorcycles)',
+      },
+    ]);
+    const health = await this.healthModel.bulkCreate([
+      {
+        healthType: 'Healthy',
+      },
+      {
+        healthType: 'Sick',
+      },
+      {
+        healthType: 'Critical',
+      },
+      {
+        healthType: 'Deceased',
+      },
+    ]);
+    const years = await this.yearModel.bulkCreate([
+      { year: 1981 },
+      { year: 1982 },
+      { year: 1983 },
+      { year: 1984 },
+      { year: 1985 },
+      { year: 1986 },
+      { year: 1987 },
+      { year: 1988 },
+      { year: 1989 },
+      { year: 1990 },
+      { year: 1991 },
+      { year: 1992 },
+      { year: 1993 },
+      { year: 1994 },
+      { year: 1995 },
+      { year: 1996 },
+      { year: 1997 },
+      { year: 1998 },
+      { year: 1999 },
+      { year: 2000 },
+      { year: 2001 },
+      { year: 2002 },
+      { year: 2003 },
+      { year: 2004 },
+      { year: 2005 },
+      { year: 2006 },
+      { year: 2007 },
+    ]);
+
+    const people: {
+      nameId: number;
+      surnameId: number;
+      yearId: number;
+      jobId: number;
+      healthId: number;
+    }[] = [];
+
+    for (let i = 0; i < 1000; i++) {
+      const nameId = names[Math.floor(Math.random() * names.length)].id;
+      const surnameId =
+        lastNames[Math.floor(Math.random() * lastNames.length)].id;
+      const yearId = years[Math.floor(Math.random() * years.length)].id;
+      const jobId = jobs[Math.floor(Math.random() * jobs.length)].id;
+      const healthId = health[Math.floor(Math.random() * health.length)].id;
+
+      people.push({
+        nameId,
+        surnameId,
+        yearId,
+        jobId,
+        healthId,
+      });
+    }
+
+    return this.personModel.bulkCreate(people);
+  }
+
   /**
    * Finds and retrieves rows from the database based on the provided options,
    * and maps each row to a simplified object containing selected fields.

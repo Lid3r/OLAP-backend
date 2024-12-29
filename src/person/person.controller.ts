@@ -17,19 +17,10 @@ export class PersonController {
     this._personService.create(createPersonDTO);
   }
 
-  /*   @Get('/table')
-  createTable(@Query() query): any {
-    const x = query['x'];
-    const y = query['y'];
-    const z = query['z'];
-    const operationInfo = {
-      field: query['field'],
-      value: query['value'],
-      aggregator: query['aggregator'],
-    } as Operation;
-    //This needs to be transposed to display correctly in the table
-    return this._personService.createTable(y, x, z, operationInfo);
-  } */
+  @Get('/migrate')
+  migrate() {
+    return this._personService.migrate();
+  }
 
   @Post('/table')
   createTable2(@Body() body: TableBody): any {

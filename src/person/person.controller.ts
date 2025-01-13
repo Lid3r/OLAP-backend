@@ -22,6 +22,11 @@ export class PersonController {
     return this._personService.migrate();
   }
 
+  @Get('/structure')
+  getDataStructure() {
+    return this._personService.getDataStructure();
+  }
+
   @Post('/table')
   createTable2(@Body() body: TableBody): any {
     //This needs to be transposed to display correctly in the table

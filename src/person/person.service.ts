@@ -43,6 +43,35 @@ export class PersonService {
     this.healthModel.sync();
   }
 
+  getDataStructure() {
+    return {
+      facts: ['person'],
+      fields: [
+        {
+          fieldName: 'firstName',
+          valueName: 'name',
+          humanReadableName: 'First Name',
+        },
+        {
+          fieldName: 'lastName',
+          valueName: 'surname',
+          humanReadableName: 'Last Name',
+        },
+        {
+          fieldName: 'year',
+          valueName: 'year',
+          humanReadableName: 'Year of birth',
+        },
+        {
+          fieldName: 'health',
+          valueName: 'healthType',
+          humanReadableName: 'Health',
+        },
+        { fieldName: 'job', valueName: 'jobName', humanReadableName: 'Job' },
+      ],
+    };
+  }
+
   async migrate() {
     const names = await this.nameModel.bulkCreate([
       { name: 'John' },
